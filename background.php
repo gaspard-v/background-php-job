@@ -1,24 +1,16 @@
 <?php
-class ConnectionToClientBuilder
+class CloseConnectionBuilder
 {
-    /**
-     * @var ?string
-     */
-    protected $dataToSend = null;
-    /**
-     * @var ?string
-     */
-    protected $contentType = null;
+    protected ?string $dataToSend = null;
 
-    /**
-     * @var int
-     */
-    protected $httpResponseCode = 200;
+    protected ?string $contentType = null;
 
-    /**
-     * @var bool
-     */
-    protected $closeConnection = true;
+    protected int $httpResponseCode = 200;
+
+    protected bool $closeConnection = true;
+
+    protected string $contentEncoding = "none";
+
     public function __construct() {
         ignore_user_abort(true);
         set_time_limit(0);
@@ -44,6 +36,11 @@ class ConnectionToClientBuilder
         $this->closeConnection = $closeConnection;
         return $this;
     }
+    public function setContentEncoding(string $contentEncoding): self
+    {
+        $this->contentEncoding = $contentEncoding;
+        return $this;
+    }
     protected function sendConnectionHeader(): void
     {
         if($this->closeConnection)
@@ -51,8 +48,15 @@ class ConnectionToClientBuilder
     }
     protected function sendContentEncodingHeader(): void
     {
-        if(!$this->dataToSend)
-            header('Content-Encoding: none');
+        if(!$this->dataToSend && $this->contentEncoding !== "none") {
+            trigger_error("Content-Encoding header is set but there's no data to send!", E_USER_WARNING);
+        }
+        if($this->dataToSend && $this->contentEncoding === "none")
+        {
+            trigger_error("Content-Encoding header is not set. I'll let the upstream server guessing data type.", E_USER_NOTICE);
+            return;
+        }
+        header("Content-Encoding: {$this->contentEncoding}");
     }
     protected function sendContentTypeHeader(): void
     {
