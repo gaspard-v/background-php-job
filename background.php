@@ -9,7 +9,7 @@ class CloseConnectionBuilder
 
     protected bool $closeConnection = true;
 
-    protected string $contentEncoding = "none";
+    protected ?string $contentEncoding = null;
 
     public function __construct()
     {
@@ -51,32 +51,34 @@ class CloseConnectionBuilder
 
         if (!$this->closeConnection)
             return;
-        if (isset($_SERVER["SERVER_PROTOCOL"]) && in_array($_SERVER["SERVER_PROTOCOL"], $allowedHttpVersion))
-            header('Connection: close');
+        if (!isset($_SERVER["SERVER_PROTOCOL"]))
+            return;
+        if (!in_array($_SERVER["SERVER_PROTOCOL"], $allowedHttpVersion))
+            return;
+        header('Connection: close');
     }
     protected function sendContentEncodingHeader(): void
     {
+        if (!$this->contentEncoding)
+            return;
         if ($this->dataToSend) {
-
-            // Leave the server managing content encoding
-            if ($this->contentEncoding === "none")
-                return;
-
             trigger_error("Content-Encoding header and data are set. This is not secure, 
             you should leave the server managing Content Encoding.", E_USER_WARNING);
         } else if ($this->contentEncoding !== "none") {
             trigger_error("Content-Encoding header is set but there's no data to send!", E_USER_WARNING);
         }
-
         header("Content-Encoding: {$this->contentEncoding}");
     }
     protected function sendContentTypeHeader(): void
     {
         if (!$this->contentType) {
-            if ($this->dataToSend)
+            if ($this->dataToSend) {
                 trigger_error("Content-Type header is not set but there's data to send!", E_USER_NOTICE);
-            else
-                header_remove("Content-Type");
+            } else {
+                header("Content-Type: none");
+                header_remove('Content-Type');
+            }
+            return;
         } else if (!$this->dataToSend) {
             trigger_error("Content-Type header is set but there's no data to send!", E_USER_WARNING);
         }
