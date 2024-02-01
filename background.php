@@ -11,7 +11,8 @@ class CloseConnectionBuilder
 
     protected string $contentEncoding = "none";
 
-    public function __construct() {
+    public function __construct()
+    {
         ignore_user_abort(true);
         set_time_limit(0);
     }
@@ -43,25 +44,43 @@ class CloseConnectionBuilder
     }
     protected function sendConnectionHeader(): void
     {
-        if($this->closeConnection)
+        $allowedHttpVersion = [
+            "HTTP/1.0",
+            "HTTP/1.1"
+        ];
+
+        if (!$this->closeConnection)
+            return;
+        if (isset($_SERVER["SERVER_PROTOCOL"]) && in_array($_SERVER["SERVER_PROTOCOL"], $allowedHttpVersion))
             header('Connection: close');
     }
     protected function sendContentEncodingHeader(): void
     {
-        if(!$this->dataToSend && $this->contentEncoding !== "none") {
+        if ($this->dataToSend) {
+
+            // Leave the server managing content encoding
+            if ($this->contentEncoding === "none")
+                return;
+
+            trigger_error("Content-Encoding header and data are set. This is not secure, 
+            you should leave the server managing Content Encoding.", E_USER_WARNING);
+        } else if ($this->contentEncoding !== "none") {
             trigger_error("Content-Encoding header is set but there's no data to send!", E_USER_WARNING);
         }
-        if($this->dataToSend && $this->contentEncoding === "none")
-        {
-            trigger_error("Content-Encoding header is not set. I'll let the upstream server guessing data type.", E_USER_NOTICE);
-            return;
-        }
+
         header("Content-Encoding: {$this->contentEncoding}");
     }
     protected function sendContentTypeHeader(): void
     {
-        if($this->contentType && $this->dataToSend)
-            header("Content-Type: {$this->contentType}");
+        if (!$this->contentType) {
+            if ($this->dataToSend)
+                trigger_error("Content-Type header is not set but there's data to send!", E_USER_NOTICE);
+            else
+                header_remove("Content-Type");
+        } else if (!$this->dataToSend) {
+            trigger_error("Content-Type header is set but there's no data to send!", E_USER_WARNING);
+        }
+        header("Content-Type: {$this->contentType}");
     }
     protected function sendHeaders(): void
     {
@@ -82,7 +101,7 @@ class CloseConnectionBuilder
             echo $this->dataToSend;
         $obLength = ob_get_length();
         if ($obLength !== false)
-            header('Content-Length: '. $obLength);
+            header('Content-Length: ' . $obLength);
         http_response_code($this->httpResponseCode);
         ob_end_flush();
         flush();
